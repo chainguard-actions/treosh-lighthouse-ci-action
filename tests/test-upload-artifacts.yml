@@ -1,0 +1,99 @@
+name: Test uploadArtifacts input
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup Chrome
+        run: |
+          CHROME=$(which google-chrome-stable 2>/dev/null \
+            || which google-chrome 2>/dev/null \
+            || which chromium 2>/dev/null \
+            || which chromium-browser 2>/dev/null \
+            || true)
+
+          if [ -z "$CHROME" ]; then
+            echo "No Chrome found, installing google-chrome-stable..."
+            curl -fsSL https://dl.google.com/linux/linux_signing_key.pub \
+              | gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg
+            echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" \
+              > /etc/apt/sources.list.d/google-chrome.list
+            apt-get update -qq
+            apt-get install -y -qq google-chrome-stable
+            CHROME=$(which google-chrome-stable 2>/dev/null || which google-chrome 2>/dev/null || true)
+          fi
+
+          if [ -z "$CHROME" ]; then
+            echo "ERROR: Chrome could not be found or installed"
+            exit 1
+          fi
+
+          echo "Using Chrome at: $CHROME"
+          echo "CHROME_PATH=$CHROME" >> $GITHUB_ENV
+          "$CHROME" --version || true
+
+      - name: Create lighthouserc config with static dir
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/.lhci-static"
+          cat > "$GITHUB_WORKSPACE/.lhci-static/index.html" << 'EOF'
+          <!DOCTYPE html>
+          <html lang="en">
+          <head><meta charset="UTF-8"><title>Test</title></head>
+          <body><h1>Upload Artifacts Test</h1></body>
+          </html>
+          EOF
+
+          mkdir -p "$GITHUB_WORKSPACE/.lhci-config"
+          cat > "$GITHUB_WORKSPACE/.lhci-config/lighthouserc.json" << EOF
+          {
+            "ci": {
+              "collect": {
+                "staticDistDir": "$GITHUB_WORKSPACE/.lhci-static",
+                "numberOfRuns": 1,
+                "settings": {
+                  "chromeFlags": "--no-sandbox --disable-gpu --disable-dev-shm-usage --headless=new --disable-setuid-sandbox"
+                }
+              }
+            }
+          }
+          EOF
+
+      - id: action
+        uses: .
+        env:
+          CHROME_PATH: ${{ env.CHROME_PATH }}
+        with:
+          configPath: '${{ github.workspace }}/.lhci-config/lighthouserc.json'
+          uploadArtifacts: 'false'
+          runs: '1'
+
+      - name: Assert resultsPath output is set
+        env:
+          RESULTS_PATH: ${{ steps.action.outputs.resultsPath }}
+        run: |
+          echo "resultsPath: $RESULTS_PATH"
+          if [ -z "$RESULTS_PATH" ]; then
+            echo "FAIL: resultsPath output is empty"
+            exit 1
+          fi
+          echo "PASS: resultsPath is set to $RESULTS_PATH"
+
+      - name: Assert results directory exists
+        env:
+          RESULTS_PATH: ${{ steps.action.outputs.resultsPath }}
+        run: |
+          echo "Checking results directory: $RESULTS_PATH"
+          if [ ! -d "$RESULTS_PATH" ]; then
+            echo "FAIL: results directory does not exist at $RESULTS_PATH"
+            exit 1
+          fi
+          count=$(find "$RESULTS_PATH" -name "*.json" | wc -l)
+          echo "Found $count JSON files in results directory"
+          if [ "$count" -lt 1 ]; then
+            echo "FAIL: no JSON result files found in $RESULTS_PATH"
+            exit 1
+          fi
+          echo "PASS: results directory exists with $count JSON files"

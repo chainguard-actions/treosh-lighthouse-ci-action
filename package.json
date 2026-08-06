@@ -1,0 +1,30 @@
+{
+  "name": "lighthouse-ci-action",
+  "version": "12.6.1",
+  "license": "MIT",
+  "description": "Run Lighthouse in CI using Github Actions",
+  "repository": "treosh/lighthouse-ci-action",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "prettier -c src/** package.json README.md && tsc -p ."
+  },
+  "dependencies": {
+    "@actions/artifact": "^6.2.1",
+    "@actions/core": "^3.0.0",
+    "@actions/github": "^9.0.0",
+    "@lhci/cli": "^0.15.1",
+    "@lhci/utils": "^0.15.1",
+    "is-windows": "^1.0.2",
+    "lodash-es": "^4.17.23"
+  },
+  "devDependencies": {
+    "@types/is-windows": "^1.0.2",
+    "@types/lodash-es": "^4.17.12",
+    "@types/node": "24.0.0",
+    "prettier": "^3.8.1",
+    "typescript": "^5.9.3"
+  }
+}

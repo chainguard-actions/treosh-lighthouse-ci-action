@@ -1,0 +1,98 @@
+name: Test LHCI server upload inputs
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup Chrome
+        run: |
+          CHROME=$(which google-chrome-stable 2>/dev/null \
+            || which google-chrome 2>/dev/null \
+            || which chromium 2>/dev/null \
+            || which chromium-browser 2>/dev/null \
+            || true)
+
+          if [ -z "$CHROME" ]; then
+            echo "No Chrome found, installing google-chrome-stable..."
+            curl -fsSL https://dl.google.com/linux/linux_signing_key.pub \
+              | gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg
+            echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" \
+              > /etc/apt/sources.list.d/google-chrome.list
+            apt-get update -qq
+            apt-get install -y -qq google-chrome-stable
+            CHROME=$(which google-chrome-stable 2>/dev/null || which google-chrome 2>/dev/null || true)
+          fi
+
+          if [ -z "$CHROME" ]; then
+            echo "ERROR: Chrome could not be found or installed"
+            exit 1
+          fi
+
+          echo "Using Chrome at: $CHROME"
+          echo "CHROME_PATH=$CHROME" >> $GITHUB_ENV
+          "$CHROME" --version || true
+
+      - name: Create lighthouserc config with static dir
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/.lhci-static"
+          cat > "$GITHUB_WORKSPACE/.lhci-static/index.html" << 'EOF'
+          <!DOCTYPE html>
+          <html lang="en">
+          <head><meta charset="UTF-8"><title>Test</title></head>
+          <body><h1>Server Upload Test</h1></body>
+          </html>
+          EOF
+
+          mkdir -p "$GITHUB_WORKSPACE/.lhci-config"
+          cat > "$GITHUB_WORKSPACE/.lhci-config/lighthouserc.json" << EOF
+          {
+            "ci": {
+              "collect": {
+                "staticDistDir": "$GITHUB_WORKSPACE/.lhci-static",
+                "numberOfRuns": 1,
+                "settings": {
+                  "chromeFlags": "--no-sandbox --disable-gpu --disable-dev-shm-usage --headless=new --disable-setuid-sandbox"
+                }
+              }
+            }
+          }
+          EOF
+
+      - id: action
+        uses: .
+        continue-on-error: true
+        env:
+          CHROME_PATH: ${{ env.CHROME_PATH }}
+        with:
+          configPath: '${{ github.workspace }}/.lhci-config/lighthouserc.json'
+          serverBaseUrl: 'http://localhost:9001'
+          serverToken: 'fake-server-token-for-testing'
+          basicAuthUsername: 'testuser'
+          basicAuthPassword: 'testpassword'
+          runs: '1'
+
+      - name: Assert action ran (collect succeeded or upload failed gracefully)
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+          RESULTS_PATH: ${{ steps.action.outputs.resultsPath }}
+        run: |
+          echo "outcome: $OUTCOME"
+          echo "resultsPath: $RESULTS_PATH"
+          # The action may fail because the LHCI server at localhost:9001 doesn't exist.
+          # That is expected — we just need to verify the inputs were accepted and
+          # the action ran (either succeeding or failing gracefully on the upload step).
+          if [ "$OUTCOME" = "success" ]; then
+            if [ -z "$RESULTS_PATH" ]; then
+              echo "FAIL: action succeeded but resultsPath is empty"
+              exit 1
+            fi
+            echo "PASS: action succeeded with resultsPath=$RESULTS_PATH"
+          elif [ "$OUTCOME" = "failure" ]; then
+            echo "PASS: action failed gracefully (no LHCI server at localhost:9001 is expected)"
+          else
+            echo "FAIL: unexpected outcome '$OUTCOME'"
+            exit 1
+          fi

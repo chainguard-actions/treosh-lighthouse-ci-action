@@ -1,0 +1,16 @@
+name: LHCI-assert-on-budget
+on: push
+permissions: {}
+jobs:
+  # This pass/fails a build with a budgets.json.
+  assert-on-budget:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Run Lighthouse on urls and validate with budgets.json
+        uses: ./
+        with:
+          urls: 'https://treo.sh/'
+          budgetPath: '.github/lighthouse/budget.json'
+          uploadArtifacts: true
+          temporaryPublicStorage: true

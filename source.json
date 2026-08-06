@@ -1,0 +1,16 @@
+{
+  "owner": "treosh",
+  "repo": "lighthouse-ci-action",
+  "version": "12.6.2",
+  "commit_sha": "3e7e23fb74242897f95c0ba9cabad3d0227b9b18",
+  "url": "https://github.com/treosh/lighthouse-ci-action",
+  "policy_sha": "d636be7e43ef829af6e853da6b3c7566db9f72fe",
+  "test_policy_sha": "843adf9e4b8f85d0c08b27b9d0b09dd094b54702",
+  "test_agent_version": "2",
+  "harden_agent_version": "2",
+  "node_artifact": {
+    "gcs_uri": "gs://prod-actions-node-artifacts/node-artifacts/treosh/lighthouse-ci-action/12.6.2/sha256-5fc1b792b318a0a64ef33dd9116c097de84b130bb89a4c1f0d31cc902691c757.tar.gz",
+    "sha256": "5fc1b792b318a0a64ef33dd9116c097de84b130bb89a4c1f0d31cc902691c757",
+    "size_bytes": 41311025
+  }
+}

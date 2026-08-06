@@ -1,0 +1,60 @@
+# lighthouse artifacts
+chrome-devtools-frontend/{scripts,services,fart.diff,issue*,log}
+chrome-devtools-frontend/front_end/{audits,sources,emulated_devices,ui}
+devtools-timeline-model/node_modules
+speedline/{artifacts.log,kpm.lock}
+
+# test directories
+__tests__
+test
+tests
+powered-test
+
+# asset directories
+docs
+doc
+website
+images
+
+# examples
+example
+examples
+
+# code coverage directories
+coverage
+.nyc_output
+
+# build scripts
+Makefile
+Gulpfile.js
+Gruntfile.js
+
+# configs
+appveyor.yml
+circle.yml
+codeship-services.yml
+codeship-steps.yml
+wercker.yml
+tsconfig.json
+bower.json
+yarn.lock
+.tern-project
+.gitattributes
+.editorconfig
+.*ignore
+.eslintrc
+.eslintrc.json
+.jshintrc
+.flowconfig
+.documentup.json
+.yarn-metadata.json
+.codecov.yml
+.travis.yml
+
+# misc
+*.md
+LICENSE
+AUTHORS
+**/.DS_Store
+**/*.map
+.config/

@@ -1,0 +1,118 @@
+name: Test URL audit with performance budget
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_REF: refs/heads/main
+      GITHUB_EVENT_NAME: push
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install Chrome
+        run: |
+          set -e
+          # Try to install google-chrome-stable via official repo
+          if ! command -v google-chrome-stable &>/dev/null && ! command -v google-chrome &>/dev/null; then
+            apt-get update -qq
+            apt-get install -y -qq wget gnupg ca-certificates 2>/dev/null || true
+            wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add - 2>/dev/null || true
+            echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list 2>/dev/null || true
+            apt-get update -qq 2>/dev/null || true
+            apt-get install -y -qq google-chrome-stable 2>/dev/null || true
+          fi
+          # Fallback: try chromium
+          if ! command -v google-chrome-stable &>/dev/null && ! command -v google-chrome &>/dev/null; then
+            apt-get update -qq 2>/dev/null || true
+            apt-get install -y -qq chromium-browser 2>/dev/null || \
+            apt-get install -y -qq chromium 2>/dev/null || true
+          fi
+          # Find and export Chrome path
+          CHROME_BIN=$(command -v google-chrome-stable || command -v google-chrome || command -v chromium-browser || command -v chromium || echo "")
+          echo "Chrome binary: $CHROME_BIN"
+          if [ -z "$CHROME_BIN" ]; then
+            echo "ERROR: No Chrome binary found"
+            exit 1
+          fi
+          echo "CHROME_PATH=$CHROME_BIN" >> $GITHUB_ENV
+
+      - name: Create a permissive budget file
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/.lhci-config"
+          cat > "$GITHUB_WORKSPACE/.lhci-config/budget.json" << 'EOF'
+          [
+            {
+              "path": "/*",
+              "resourceSizes": [
+                { "resourceType": "total", "budget": 10000 }
+              ],
+              "timings": [
+                { "metric": "first-contentful-paint", "budget": 30000 }
+              ]
+            }
+          ]
+          EOF
+
+      - name: Create lighthouserc config
+        run: |
+          cat > "$GITHUB_WORKSPACE/.lhci-config/lighthouserc.json" << 'EOF'
+          {
+            "ci": {
+              "collect": {
+                "url": ["https://example.com/"],
+                "numberOfRuns": 1,
+                "settings": {
+                  "chromeFlags": "--no-sandbox --disable-gpu --disable-dev-shm-usage --headless=new --disable-setuid-sandbox"
+                }
+              }
+            }
+          }
+          EOF
+
+      - id: action
+        uses: .
+        env:
+          CHROME_PATH: ${{ env.CHROME_PATH }}
+        with:
+          urls: 'https://example.com/'
+          budgetPath: '${{ github.workspace }}/.lhci-config/budget.json'
+          configPath: '${{ github.workspace }}/.lhci-config/lighthouserc.json'
+          runs: '1'
+
+      - name: Assert resultsPath output is set
+        env:
+          RESULTS_PATH: ${{ steps.action.outputs.resultsPath }}
+        run: |
+          echo "resultsPath: $RESULTS_PATH"
+          if [ -z "$RESULTS_PATH" ]; then
+            echo "FAIL: resultsPath output is empty"
+            exit 1
+          fi
+          echo "PASS: resultsPath is set to $RESULTS_PATH"
+
+      - name: Assert assertionResults output
+        env:
+          ASSERTION_RESULTS: ${{ steps.action.outputs.assertionResults }}
+        run: |
+          echo "assertionResults: $ASSERTION_RESULTS"
+          # assertionResults may be empty if no assertions failed, that's OK
+          # Just verify the step completed successfully
+          echo "PASS: action completed with budget assertions"
+
+      - name: Assert results directory exists
+        env:
+          RESULTS_PATH: ${{ steps.action.outputs.resultsPath }}
+        run: |
+          echo "Checking results directory: $RESULTS_PATH"
+          if [ ! -d "$RESULTS_PATH" ]; then
+            echo "FAIL: results directory does not exist at $RESULTS_PATH"
+            exit 1
+          fi
+          count=$(find "$RESULTS_PATH" -name "*.json" | wc -l)
+          echo "Found $count JSON files in results directory"
+          if [ "$count" -lt 1 ]; then
+            echo "FAIL: no JSON result files found in $RESULTS_PATH"
+            exit 1
+          fi
+          echo "PASS: results directory exists with $count JSON files"

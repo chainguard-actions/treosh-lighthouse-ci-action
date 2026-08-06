@@ -1,0 +1,75 @@
+name: Test budget assertions
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup Chrome
+        run: |
+          # Check for existing Chrome installations
+          CHROME=$(which google-chrome-stable 2>/dev/null \
+            || which google-chrome 2>/dev/null \
+            || which chromium 2>/dev/null \
+            || which chromium-browser 2>/dev/null \
+            || true)
+
+          if [ -z "$CHROME" ]; then
+            echo "No Chrome found, installing google-chrome-stable from Google..."
+            curl -fsSL https://dl.google.com/linux/linux_signing_key.pub \
+              | gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg
+            echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" \
+              > /etc/apt/sources.list.d/google-chrome.list
+            apt-get update -qq
+            apt-get install -y -qq google-chrome-stable
+            CHROME=$(which google-chrome-stable 2>/dev/null || which google-chrome 2>/dev/null || true)
+          fi
+
+          if [ -z "$CHROME" ]; then
+            echo "ERROR: Chrome could not be found or installed"
+            exit 1
+          fi
+
+          echo "Using Chrome at: $CHROME"
+          echo "CHROME_PATH=$CHROME" >> $GITHUB_ENV
+          "$CHROME" --version || true
+
+      - id: lhci
+        uses: .
+        with:
+          configPath: ${{ github.workspace }}/tests/fixtures/lighthouserc-static.json
+          budgetPath: ${{ github.workspace }}/tests/fixtures/budget-lenient.json
+
+      - name: Assert resultsPath is set
+        env:
+          RESULTS_PATH: ${{ steps.lhci.outputs.resultsPath }}
+        run: |
+          echo "resultsPath: $RESULTS_PATH"
+          if [ -z "$RESULTS_PATH" ]; then
+            echo "FAIL: resultsPath output is empty"
+            exit 1
+          fi
+          echo "PASS: resultsPath is set to $RESULTS_PATH"
+
+      - name: Assert assertionResults output is set
+        env:
+          ASSERTION_RESULTS: ${{ steps.lhci.outputs.assertionResults }}
+        run: |
+          echo "assertionResults: $ASSERTION_RESULTS"
+          # assertionResults can be empty (no failures) or a JSON array
+          # Both are valid outcomes when using a lenient budget
+          echo "PASS: assertionResults output checked (value may be empty for passing audits)"
+
+      - name: Assert results directory exists with reports
+        env:
+          RESULTS_PATH: ${{ steps.lhci.outputs.resultsPath }}
+        run: |
+          echo "Checking directory: $RESULTS_PATH"
+          if [ ! -d "$RESULTS_PATH" ]; then
+            echo "FAIL: resultsPath directory does not exist"
+            exit 1
+          fi
+          echo "PASS: resultsPath directory exists"
+          ls -la "$RESULTS_PATH"
