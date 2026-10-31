@@ -6,9 +6,9 @@ Hardened by [Chainguard](https://www.chainguard.dev) from the upstream action at
 
 ## Versions
 
-| Version | Tag | Upstream commit |
-|---------|-----|-----------------|
-| 12.6.2 | [`12.6.2`](https://github.com/chainguard-actions/treosh-lighthouse-ci-action/tree/12.6.2) | [`3e7e23f`](https://github.com/treosh/lighthouse-ci-action/commit/3e7e23fb74242897f95c0ba9cabad3d0227b9b18) |
+| Version | Tag | Upstream commit | Hardening report |
+|---------|-----|-----------------|------------------|
+| 12.6.2 | [`12.6.2`](https://github.com/chainguard-actions/treosh-lighthouse-ci-action/tree/12.6.2) | [`3e7e23f`](https://github.com/treosh/lighthouse-ci-action/commit/3e7e23fb74242897f95c0ba9cabad3d0227b9b18) | [`HARDENING.md`](https://github.com/chainguard-actions/treosh-lighthouse-ci-action/blob/12.6.2/HARDENING.md) |
 
 ## Privacy
 
